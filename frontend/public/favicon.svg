@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="DN7">
+  <defs>
+    <linearGradient id="fg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="0.55" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#fg)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="32,6 53,18 53,42 32,54 11,42 11,18" opacity="0.55"/>
+    <path d="M32 30 L32 6 M32 30 L53 18 M32 30 L53 42 M32 30 L32 54 M32 30 L11 42 M32 30 L11 18"/>
+  </g>
+  <g fill="url(#fg)">
+    <circle cx="32" cy="30" r="5.2"/>
+    <circle cx="32" cy="6" r="3.3"/>
+    <circle cx="53" cy="18" r="3.3"/>
+    <circle cx="53" cy="42" r="3.3"/>
+    <circle cx="32" cy="54" r="3.3"/>
+    <circle cx="11" cy="42" r="3.3"/>
+    <circle cx="11" cy="18" r="3.3"/>
+  </g>
+</svg>

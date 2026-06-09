@@ -147,24 +147,38 @@ SITE="https://dn7.cn"
 case "$(uname -m)" in
   x86_64|amd64) ARCH=x86_64 ;;
   aarch64|arm64) ARCH=arm64 ;;
-  *) echo "[dn7] unsupported arch: $(uname -m)" >&2; exit 1 ;;
+  *) echo "[DN7] unsupported arch: $(uname -m)" >&2; exit 1 ;;
 esac
 
 URL="$SITE/api/panel/download?arch=$ARCH"
 OUT=dn7-panel
 
-echo "[dn7] downloading DN7 Panel ($ARCH) ..."
+echo "[DN7] downloading DN7 Panel ($ARCH) ..."
 if command -v curl >/dev/null 2>&1; then
   curl -fL --progress-bar "$URL" -o "$OUT"
 elif command -v wget >/dev/null 2>&1; then
   wget -O "$OUT" "$URL"
 else
-  echo "[dn7] neither curl nor wget found" >&2; exit 1
+  echo "[DN7] neither curl nor wget found" >&2; exit 1
 fi
 
 chmod +x "$OUT"
-echo "[dn7] starting DN7 Panel ..."
-./"$OUT"
+echo "[DN7] starting DN7 Panel ..."
+
+# Resolve a public + internal address for the console hint.
+INTERNAL_IP="$( (ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}') || true )"
+[ -z "$INTERNAL_IP" ] && INTERNAL_IP="$( (hostname -I 2>/dev/null | awk '{print $1}') || true )"
+[ -z "$INTERNAL_IP" ] && INTERNAL_IP="127.0.0.1"
+PUBLIC_IP="$( (curl -fsSL --max-time 4 https://api.ipify.org 2>/dev/null) || true )"
+
+echo ""
+echo "  console   ->  http://${PUBLIC_IP:-$INTERNAL_IP}:1080"
+[ -n "$PUBLIC_IP" ] && echo "            ->  http://${INTERNAL_IP}:1080"
+echo "  username  ->  admin"
+echo "  status    ->  running"
+echo ""
+
+TEAOPS_BACKEND_URL="$SITE" ./"$OUT"
 "#;
     (
         StatusCode::OK,

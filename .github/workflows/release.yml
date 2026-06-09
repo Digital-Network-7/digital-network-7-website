@@ -1,0 +1,115 @@
+name: Build Release
+
+# Build the DN7 website as a SINGLE self-contained binary on every push to main.
+# The frontend is built first, then embedded into the Rust binary (rust-embed),
+# so the only deploy artifact is one executable. Version: 1.0.<run_number>.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  BIN_NAME: dn7-website
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            arch: x86_64
+          - target: aarch64-unknown-linux-musl
+            arch: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute version (1.0.x)
+        id: ver
+        run: echo "version=1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp version into Cargo.toml
+        run: |
+          sed -i -E "0,/^version = \".*\"/s//version = \"${{ steps.ver.outputs.version }}\"/" Cargo.toml
+          grep -m1 '^version' Cargo.toml
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install musl cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          cargo install cross --git https://github.com/cross-rs/cross --locked || true
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build release binary (musl static)
+        run: |
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            cross build --release --target ${{ matrix.target }}
+          else
+            rustup target add ${{ matrix.target }}
+            cargo build --release --target ${{ matrix.target }}
+          fi
+
+      - name: Package binary
+        id: pkg
+        run: |
+          OUT="${BIN_NAME}-linux-${{ matrix.arch }}-v${{ steps.ver.outputs.version }}"
+          cp "target/${{ matrix.target }}/release/${BIN_NAME}" "${OUT}"
+          chmod +x "${OUT}"
+          echo "artifact=${OUT}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.pkg.outputs.artifact }}
+          path: ${{ steps.pkg.outputs.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute version (1.0.x)
+        id: ver
+        run: echo "version=1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: v${{ steps.ver.outputs.version }}
+          body: |
+            Automated build of ${{ env.BIN_NAME }} v${{ steps.ver.outputs.version }} (x86_64 + arm64).
+            Single self-contained binary (frontend embedded). Commit: ${{ github.sha }}
+          files: dist/*

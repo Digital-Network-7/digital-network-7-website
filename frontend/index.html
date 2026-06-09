@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <title>Digital Network 7</title>
+  <meta name="description" content="Digital Network 7 — next-generation distributed network infrastructure. Home of DN7 Panel." />
+  <script>
+    // Resolve the UI language BEFORE first paint so there's never a flash of the
+    // wrong language. Priority: saved choice > browser language > English.
+    (function () {
+      try {
+        var supported = ['zh-CN', 'zh-TW', 'en', 'ja'];
+        var saved = localStorage.getItem('dn7_lang');
+        var lang = supported.indexOf(saved) >= 0 ? saved : null;
+        if (!lang) {
+          var navs = (navigator.languages && navigator.languages.length)
+            ? navigator.languages : [navigator.language || 'en'];
+          for (var i = 0; i < navs.length && !lang; i++) {
+            var l = (navs[i] || '').toLowerCase();
+            if (l.indexOf('zh') === 0) {
+              lang = (l.indexOf('tw') >= 0 || l.indexOf('hk') >= 0 || l.indexOf('hant') >= 0) ? 'zh-TW' : 'zh-CN';
+            } else if (l.indexOf('ja') === 0) {
+              lang = 'ja';
+            } else if (l.indexOf('en') === 0) {
+              lang = 'en';
+            }
+          }
+        }
+        if (!lang) lang = 'en';
+        window.__DN7_LANG__ = lang;
+        document.documentElement.lang = lang;
+      } catch (e) { window.__DN7_LANG__ = 'en'; }
+    })();
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+[package]
+name = "dn7-website"
+version = "0.1.0"
+edition = "2021"
+description = "Digital Network 7 (dn7.cn) public website + API — single self-contained binary"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = "0.7"
+# Embed the built frontend (frontend/dist) directly into the binary so the
+# whole site ships as ONE deployable file — no separate static folder.
+rust-embed = { version = "8", features = ["mime-guess"] }
+mime_guess = "2"
+# Upstream proxy to the existing agent-distribution origin (download/version).
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots", "stream", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true

@@ -178,7 +178,7 @@ echo "  username  ->  admin"
 echo "  status    ->  running"
 echo ""
 
-TEAOPS_BACKEND_URL="$SITE" ./"$OUT"
+./"$OUT"
 "#;
     (
         StatusCode::OK,

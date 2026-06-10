@@ -7,10 +7,9 @@
 //!   * `/api/*`                       -> JSON API (DN7 Panel release metadata)
 //!   * `/start.sh`                    -> the one-line installer for DN7 Panel
 //!
-//! Downloads are presented under the dn7.cn brand. For this first version the
-//! actual binaries still come from the existing distribution origin
-//! (`UPSTREAM`); the proxy here lets the public URL be `dn7.cn` today and become
-//! the full origin later without changing the user-facing command.
+//! Downloads are presented under the dn7.cn brand and mirror the DN7 Panel
+//! GitHub releases (`GITHUB_REPO`), so the public URL is dn7.cn today and the
+//! origin can move without changing the user-facing command.
 
 mod api;
 mod assets;
@@ -20,9 +19,9 @@ use std::net::SocketAddr;
 use axum::routing::get;
 use axum::Router;
 
-/// Existing agent-distribution origin we proxy to for v1 (binaries, version).
-/// Kept in one place so it's trivial to flip to a local origin later.
-pub const UPSTREAM: &str = "https://api.teaops.dn7.cn";
+/// GitHub `owner/repo` that publishes the DN7 Panel release binaries. The site
+/// mirrors/proxies these; kept in one place so it's trivial to change later.
+pub const GITHUB_REPO: &str = "Digital-Network-7/DN7-Panel";
 
 #[derive(Clone)]
 pub struct AppState {
@@ -52,6 +51,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/start.sh", get(api::start_script))
         // JSON API.
         .route("/api/health", get(api::health))
+        .route("/api/panel/version", get(api::panel_version))
         .route("/api/panel/latest", get(api::panel_latest))
         .route("/api/panel/download", get(api::panel_download))
         // Everything else: the embedded SPA (with client-side routing fallback).

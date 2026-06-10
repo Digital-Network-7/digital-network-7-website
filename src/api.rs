@@ -1,10 +1,13 @@
 //! JSON API + installer for the DN7 website.
 //!
-//! For v1 the binaries still live at the existing distribution origin
-//! (`crate::UPSTREAM`); these handlers present them under the dn7.cn brand:
+//! dn7.cn is a domestic mirror/front-end for the DN7 Panel GitHub releases. The
+//! binaries are published on GitHub (`Digital-Network-7/DN7-Panel`); these
+//! handlers resolve the latest release deterministically (via the
+//! `releases/latest` redirect — no api.github.com, so no rate limit) and:
 //!   * `/start.sh`            -> installer that downloads from dn7.cn/api/...
-//!   * `/api/panel/latest`    -> release manifest (proxied + rebranded)
-//!   * `/api/panel/download`  -> streams the binary (proxied)
+//!   * `/api/panel/version`   -> release manifest the panel's updater consumes
+//!   * `/api/panel/latest`    -> richer manifest for the website UI
+//!   * `/api/panel/download`  -> streams the binary (proxied from GitHub)
 
 use axum::body::Body;
 use axum::extract::{Query, State};
@@ -14,7 +17,7 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::AppState;
+use crate::{AppState, GITHUB_REPO};
 
 pub async fn health() -> Response {
     Json(json!({ "ok": true })).into_response()
@@ -33,13 +36,58 @@ fn norm_arch(a: Option<&str>) -> &'static str {
     }
 }
 
-/// GET /api/panel/latest — the DN7 Panel release manifest. Proxies the upstream
-/// distribution manifest and rewrites the download URLs to go through dn7.cn so
-/// the public site is the single entry point.
-pub async fn panel_latest(State(state): State<AppState>) -> Response {
-    let url = format!("{}/agent/dist/latest", crate::UPSTREAM);
-    let upstream = match state.http.get(&url).send().await {
-        Ok(r) => r,
+/// Public base URL used to build absolute download links in manifests.
+fn public_base() -> String {
+    std::env::var("DN7_PUBLIC_URL")
+        .unwrap_or_else(|_| "https://dn7.cn".to_string())
+        .trim_end_matches('/')
+        .to_string()
+}
+
+fn asset_name(version: &str, arch: &str) -> String {
+    format!("dn7-panel-linux-{arch}-v{version}")
+}
+
+/// Resolve the latest release tag (e.g. `v1.0.9`) without hitting
+/// api.github.com: follow the `releases/latest` redirect and read the final
+/// URL's tag segment.
+async fn latest_tag(http: &reqwest::Client) -> anyhow::Result<String> {
+    let url = format!("https://github.com/{GITHUB_REPO}/releases/latest");
+    let resp = http.get(&url).send().await?;
+    let final_url = resp.url().as_str().to_string();
+    let tag = final_url
+        .rsplit('/')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if tag.is_empty() || !tag.starts_with('v') {
+        anyhow::bail!("could not resolve latest tag (final url: {final_url})");
+    }
+    Ok(tag)
+}
+
+/// Best-effort: fetch the release's SHA256SUMS and find `asset`'s hash.
+async fn sha_for(http: &reqwest::Client, tag: &str, asset: &str) -> Option<String> {
+    let url = format!("https://github.com/{GITHUB_REPO}/releases/download/{tag}/SHA256SUMS");
+    let body = http.get(&url).send().await.ok()?.text().await.ok()?;
+    for line in body.lines() {
+        let mut it = line.split_whitespace();
+        let hash = it.next()?;
+        let name = it.next().unwrap_or("").trim_start_matches('*');
+        if name == asset && hash.len() == 64 {
+            return Some(hash.to_lowercase());
+        }
+    }
+    None
+}
+
+/// GET /api/panel/version?arch= — the manifest the panel's self-update DN7
+/// source consumes: version + absolute download URL + sha256.
+pub async fn panel_version(State(state): State<AppState>, Query(q): Query<ArchQuery>) -> Response {
+    let arch = norm_arch(q.arch.as_deref());
+    let tag = match latest_tag(&state.http).await {
+        Ok(t) => t,
         Err(e) => {
             return (
                 StatusCode::BAD_GATEWAY,
@@ -48,52 +96,76 @@ pub async fn panel_latest(State(state): State<AppState>) -> Response {
                 .into_response()
         }
     };
-    let body: serde_json::Value = match upstream.json().await {
-        Ok(v) => v,
-        Err(_) => {
-            return (
-                StatusCode::BAD_GATEWAY,
-                Json(json!({ "ok": false, "error": "bad upstream response" })),
-            )
-                .into_response()
-        }
-    };
-    let data = body.get("data").cloned().unwrap_or(json!({}));
-    let version = data
-        .get("version")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    let sizes = data.get("sizes").cloned().unwrap_or(json!({}));
-    let sha256 = data.get("sha256").cloned().unwrap_or(json!({}));
-
-    // Rewrite per-arch download URLs to dn7.cn.
-    let mut downloads = serde_json::Map::new();
-    for arch in ["x86_64", "arm64"] {
-        downloads.insert(
-            arch.to_string(),
-            json!(format!("/api/panel/download?arch={arch}")),
-        );
-    }
-
+    let version = tag.trim_start_matches('v').to_string();
+    let asset = asset_name(&version, arch);
+    let sha256 = sha_for(&state.http, &tag, &asset).await;
     Json(json!({
         "ok": true,
         "data": {
             "product": "DN7 Panel",
             "version": version,
-            "sizes": sizes,
+            "arch": arch,
+            "url": format!("{}/api/panel/download?arch={arch}", public_base()),
             "sha256": sha256,
+        }
+    }))
+    .into_response()
+}
+
+/// GET /api/panel/latest — richer manifest for the website UI (both arches).
+pub async fn panel_latest(State(state): State<AppState>) -> Response {
+    let tag = match latest_tag(&state.http).await {
+        Ok(t) => t,
+        Err(e) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "ok": false, "error": format!("upstream unreachable: {e}") })),
+            )
+                .into_response()
+        }
+    };
+    let version = tag.trim_start_matches('v').to_string();
+    let base = public_base();
+    let mut downloads = serde_json::Map::new();
+    let mut sha256 = serde_json::Map::new();
+    for arch in ["x86_64", "arm64"] {
+        downloads.insert(
+            arch.to_string(),
+            json!(format!("{base}/api/panel/download?arch={arch}")),
+        );
+        if let Some(h) = sha_for(&state.http, &tag, &asset_name(&version, arch)).await {
+            sha256.insert(arch.to_string(), json!(h));
+        }
+    }
+    Json(json!({
+        "ok": true,
+        "data": {
+            "product": "DN7 Panel",
+            "version": version,
             "downloads": downloads,
+            "sha256": sha256,
             "install": "curl -fsSL https://dn7.cn/start.sh | sh",
         }
     }))
     .into_response()
 }
 
-/// GET /api/panel/download?arch= — stream the binary from the upstream origin.
+/// GET /api/panel/download?arch= — stream the binary from the GitHub release.
 pub async fn panel_download(State(state): State<AppState>, Query(q): Query<ArchQuery>) -> Response {
     let arch = norm_arch(q.arch.as_deref());
-    let url = format!("{}/agent/dist/download?arch={arch}", crate::UPSTREAM);
+    let tag = match latest_tag(&state.http).await {
+        Ok(t) => t,
+        Err(e) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                format!("upstream unreachable: {e}"),
+            )
+                .into_response()
+        }
+    };
+    let version = tag.trim_start_matches('v');
+    let asset = asset_name(version, arch);
+    let url = format!("https://github.com/{GITHUB_REPO}/releases/download/{tag}/{asset}");
     let upstream = match state.http.get(&url).send().await {
         Ok(r) => r,
         Err(e) => {
@@ -107,23 +179,18 @@ pub async fn panel_download(State(state): State<AppState>, Query(q): Query<ArchQ
     if !upstream.status().is_success() {
         return (StatusCode::BAD_GATEWAY, "binary not available yet").into_response();
     }
-    // Carry through the filename + content type, stream the body.
-    let disposition = upstream
-        .headers()
-        .get(header::CONTENT_DISPOSITION)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("attachment")
-        .to_string();
     let length = upstream
         .headers()
         .get(header::CONTENT_LENGTH)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
-
     let mut resp = Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/octet-stream")
-        .header(header::CONTENT_DISPOSITION, disposition);
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{asset}\""),
+        );
     if let Some(len) = length {
         resp = resp.header(header::CONTENT_LENGTH, len);
     }
@@ -136,7 +203,7 @@ pub async fn panel_download(State(state): State<AppState>, Query(q): Query<ArchQ
 ///   curl -fsSL https://dn7.cn/start.sh | sh
 ///
 /// Detects the CPU arch and downloads the latest DN7 Panel from dn7.cn (which
-/// proxies the current distribution origin), makes it executable, and runs it.
+/// mirrors the GitHub release), makes it executable, and runs it.
 pub async fn start_script() -> Response {
     let script = r#"#!/bin/sh
 # Digital Network 7 — DN7 Panel installer.

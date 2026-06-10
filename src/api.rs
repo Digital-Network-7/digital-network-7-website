@@ -232,37 +232,10 @@ fi
 chmod +x "$OUT"
 echo "[DN7] starting DN7 Panel ..."
 
-# Resolve a public + internal address for the console hint.
-INTERNAL_IP="$( (ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}') || true )"
-[ -z "$INTERNAL_IP" ] && INTERNAL_IP="$( (hostname -I 2>/dev/null | awk '{print $1}') || true )"
-[ -z "$INTERNAL_IP" ] && INTERNAL_IP="127.0.0.1"
-PUBLIC_IP="$( (curl -fsSL --max-time 4 https://api.ipify.org 2>/dev/null) || true )"
-
-# Launch (installs itself + daemonizes, then returns).
+# Launch. The panel installs itself, prints the console address + credentials
+# to this terminal, then daemonizes — so the disclosure lives in the binary,
+# not in this script.
 ./"$OUT"
-
-# Retrieve the auto-generated console password once. It is stored encrypted at
-# rest and never logged, so we read it back via the panel's own subcommand and
-# print it here a single time for the operator.
-PW=""
-i=0
-while [ "$i" -lt 15 ]; do
-  PW="$("$OUT" password 2>/dev/null || true)"
-  [ -n "$PW" ] && break
-  i=$((i + 1)); sleep 1
-done
-
-echo ""
-echo "  console   ->  http://${PUBLIC_IP:-$INTERNAL_IP}:1080"
-[ -n "$PUBLIC_IP" ] && echo "            ->  http://${INTERNAL_IP}:1080"
-echo "  username  ->  admin"
-if [ -n "$PW" ]; then
-  echo "  password  ->  $PW"
-else
-  echo "  password  ->  (run: dn7-panel password)"
-fi
-echo "  status    ->  running"
-echo ""
 "#;
     (
         StatusCode::OK,

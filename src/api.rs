@@ -238,14 +238,31 @@ INTERNAL_IP="$( (ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if(
 [ -z "$INTERNAL_IP" ] && INTERNAL_IP="127.0.0.1"
 PUBLIC_IP="$( (curl -fsSL --max-time 4 https://api.ipify.org 2>/dev/null) || true )"
 
+# Launch (installs itself + daemonizes, then returns).
+./"$OUT"
+
+# Retrieve the auto-generated console password once. It is stored encrypted at
+# rest and never logged, so we read it back via the panel's own subcommand and
+# print it here a single time for the operator.
+PW=""
+i=0
+while [ "$i" -lt 15 ]; do
+  PW="$("$OUT" password 2>/dev/null || true)"
+  [ -n "$PW" ] && break
+  i=$((i + 1)); sleep 1
+done
+
 echo ""
 echo "  console   ->  http://${PUBLIC_IP:-$INTERNAL_IP}:1080"
 [ -n "$PUBLIC_IP" ] && echo "            ->  http://${INTERNAL_IP}:1080"
 echo "  username  ->  admin"
+if [ -n "$PW" ]; then
+  echo "  password  ->  $PW"
+else
+  echo "  password  ->  (run: dn7-panel password)"
+fi
 echo "  status    ->  running"
 echo ""
-
-./"$OUT"
 "#;
     (
         StatusCode::OK,

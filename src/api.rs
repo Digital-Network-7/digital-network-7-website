@@ -106,49 +106,10 @@ pub async fn panel_version(State(state): State<AppState>, Query(q): Query<ArchQu
             "version": version,
             "arch": arch,
             "url": format!("{base}/api/panel/download?arch={arch}"),
-            "sig": format!("{base}/api/panel/download.sig?arch={arch}"),
             "asset": asset,
         }
     }))
     .into_response()
-}
-
-/// GET /api/panel/download.sig?arch= — stream the detached Ed25519 signature
-/// for the latest binary (proxied from the GitHub release `<asset>.sig`).
-pub async fn panel_download_sig(
-    State(state): State<AppState>,
-    Query(q): Query<ArchQuery>,
-) -> Response {
-    let arch = norm_arch(q.arch.as_deref());
-    let tag = match latest_tag(&state.http).await {
-        Ok(t) => t,
-        Err(e) => {
-            return (
-                StatusCode::BAD_GATEWAY,
-                format!("upstream unreachable: {e}"),
-            )
-                .into_response()
-        }
-    };
-    let version = tag.trim_start_matches('v');
-    let asset = asset_name(version, arch);
-    let url = format!("https://github.com/{GITHUB_REPO}/releases/download/{tag}/{asset}.sig");
-    match state.http.get(&url).send().await {
-        Ok(r) if r.status().is_success() => match r.bytes().await {
-            Ok(b) => (
-                [(header::CONTENT_TYPE, "application/octet-stream")],
-                b.to_vec(),
-            )
-                .into_response(),
-            Err(e) => (StatusCode::BAD_GATEWAY, format!("read error: {e}")).into_response(),
-        },
-        Ok(_) => (StatusCode::BAD_GATEWAY, "signature not available yet").into_response(),
-        Err(e) => (
-            StatusCode::BAD_GATEWAY,
-            format!("upstream unreachable: {e}"),
-        )
-            .into_response(),
-    }
 }
 
 /// GET /api/panel/latest — richer manifest for the website UI (both arches).

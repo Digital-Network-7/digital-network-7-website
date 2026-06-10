@@ -54,7 +54,6 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/panel/version", get(api::panel_version))
         .route("/api/panel/latest", get(api::panel_latest))
         .route("/api/panel/download", get(api::panel_download))
-        .route("/api/panel/download.sig", get(api::panel_download_sig))
         // Everything else: the embedded SPA (with client-side routing fallback).
         .fallback(assets::static_handler)
         .with_state(state);

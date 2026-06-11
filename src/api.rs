@@ -150,6 +150,37 @@ pub async fn panel_latest(State(state): State<AppState>) -> Response {
     .into_response()
 }
 
+/// Fetch + parse the changelog index asset from the latest GitHub release.
+async fn fetch_releases_index(http: &reqwest::Client) -> anyhow::Result<serde_json::Value> {
+    let url = format!("https://github.com/{GITHUB_REPO}/releases/latest/download/releases.json");
+    Ok(http
+        .get(&url)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?)
+}
+
+/// GET /api/panel/releases — the changelog index the panel's "what's new" view
+/// consumes. Mirrored from the GitHub release asset reachable via the
+/// deterministic `releases/latest/download/` redirect (no api.github.com), so
+/// dn7.cn can serve the same changelog when GitHub is slow/blocked.
+pub async fn panel_releases(State(state): State<AppState>) -> Response {
+    match fetch_releases_index(&state.http).await {
+        Ok(v) => {
+            // Accept either a bare index or one wrapped in {data:...}.
+            let inner = v.get("data").cloned().unwrap_or(v);
+            Json(json!({ "ok": true, "data": inner })).into_response()
+        }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "ok": false, "error": format!("upstream unreachable: {e}") })),
+        )
+            .into_response(),
+    }
+}
+
 /// GET /api/panel/download?arch= — stream the binary from the GitHub release.
 pub async fn panel_download(State(state): State<AppState>, Query(q): Query<ArchQuery>) -> Response {
     let arch = norm_arch(q.arch.as_deref());

@@ -46,7 +46,7 @@ export interface Dict {
     copied: string;
     note: string;
   };
-  footer: { rights: string; beian: string; tagline: string };
+  footer: { rights: string; beian: string; tagline: string; friends: string };
 }
 
 const en: Dict = {
@@ -123,6 +123,7 @@ const en: Dict = {
     rights: 'All rights reserved.',
     beian: '沪ICP备2026021336号',
     tagline: 'Composable infrastructure for distributed systems.',
+    friends: 'Friends',
   },
 };
 
@@ -187,6 +188,7 @@ const zhCN: Dict = {
     rights: '版权所有。',
     beian: '沪ICP备2026021336号',
     tagline: '面向分布式系统的可组合基础设施。',
+    friends: '友情链接',
   },
 };
 
@@ -251,6 +253,7 @@ const zhTW: Dict = {
     rights: '版權所有。',
     beian: '滬ICP備2026021336號',
     tagline: '面向分散式系統的可組合基礎設施。',
+    friends: '友情連結',
   },
 };
 
@@ -315,6 +318,7 @@ const ja: Dict = {
     rights: 'All rights reserved.',
     beian: '沪ICP备2026021336号',
     tagline: '分散システムのための組み合わせ可能な基盤。',
+    friends: 'リンク',
   },
 };
 

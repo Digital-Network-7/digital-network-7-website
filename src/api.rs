@@ -1,15 +1,21 @@
 //! JSON API + installer for the DN7 website.
 //!
-//! dn7.cn is a domestic mirror/front-end for the DN7 Panel GitHub releases. The
-//! binaries are published on GitHub (`Digital-Network-7/DN7-Panel`); these
-//! handlers resolve the latest release deterministically (via the
-//! `releases/latest` redirect — no api.github.com, so no rate limit) and:
-//!   * `/start.sh`            -> installer that downloads from dn7.cn/api/...
-//!   * `/api/panel/version`   -> release manifest the panel's updater consumes
+//! dn7.cn is the domestic origin for DN7 Panel. Panel CI **pushes** every
+//! freshly-built, signed binary to `/api/panel/ingest`; an operator marks one
+//! version stable in the admin backend. The public endpoints then serve only
+//! that stable version:
+//!   * `/start.sh`            -> installer that downloads from dn7.cn
+//!   * `/api/panel/version`   -> manifest the panel's (dn7-source) updater reads
 //!   * `/api/panel/latest`    -> richer manifest for the website UI
-//!   * `/api/panel/download`  -> streams the binary (proxied from GitHub)
+//!   * `/api/panel/download`  -> streams the stored stable binary
+//!   * `/api/panel/ingest`    -> CI push (auth = appended release signature)
+//!   * `/api/panel/releases`  -> changelog index (still mirrored from GitHub)
+//!
+//! "Stable" is what the panel's default `dn7` update source consumes; the
+//! panel's separate `github` ("preview") source still tracks the absolute
+//! latest, so this gate only governs the curated channel.
 
-use axum::body::Body;
+use axum::body::{Body, Bytes};
 use axum::extract::{Query, State};
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -17,7 +23,7 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::{AppState, GITHUB_REPO};
+use crate::{store, AppState, GITHUB_REPO};
 
 pub async fn health() -> Response {
     Json(json!({ "ok": true })).into_response()
@@ -44,69 +50,36 @@ fn public_base() -> String {
         .to_string()
 }
 
-fn asset_name(version: &str, arch: &str) -> String {
-    format!("dn7-panel-linux-{arch}-v{version}")
+fn no_stable() -> Response {
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({ "ok": false, "error": "no stable release available yet" })),
+    )
+        .into_response()
 }
 
-/// Resolve the latest release tag (e.g. `v1.0.9`) without hitting
-/// api.github.com: follow the `releases/latest` redirect and read the final
-/// URL's tag segment.
-async fn latest_tag(http: &reqwest::Client) -> anyhow::Result<String> {
-    let url = format!("https://github.com/{GITHUB_REPO}/releases/latest");
-    let resp = http.get(&url).send().await?;
-    let final_url = resp.url().as_str().to_string();
-    let tag = final_url
-        .rsplit('/')
-        .next()
-        .unwrap_or("")
-        .trim()
-        .to_string();
-    if tag.is_empty() || !tag.starts_with('v') {
-        anyhow::bail!("could not resolve latest tag (final url: {final_url})");
-    }
-    Ok(tag)
-}
-
-/// Best-effort: fetch the release's SHA256SUMS and find `asset`'s hash.
-async fn sha_for(http: &reqwest::Client, tag: &str, asset: &str) -> Option<String> {
-    let url = format!("https://github.com/{GITHUB_REPO}/releases/download/{tag}/SHA256SUMS");
-    let body = http.get(&url).send().await.ok()?.text().await.ok()?;
-    for line in body.lines() {
-        let mut it = line.split_whitespace();
-        let hash = it.next()?;
-        let name = it.next().unwrap_or("").trim_start_matches('*');
-        if name == asset && hash.len() == 64 {
-            return Some(hash.to_lowercase());
-        }
-    }
-    None
-}
-
-/// GET /api/panel/version?arch= — the manifest the panel's self-update DN7
-/// source consumes: version + absolute download URL + sha256.
+/// GET /api/panel/version?arch= — the manifest the panel's self-update `dn7`
+/// source consumes: version + absolute download URL + sha256 of the stable
+/// build for `arch`.
 pub async fn panel_version(State(state): State<AppState>, Query(q): Query<ArchQuery>) -> Response {
     let arch = norm_arch(q.arch.as_deref());
-    let tag = match latest_tag(&state.http).await {
-        Ok(t) => t,
-        Err(e) => {
-            return (
-                StatusCode::BAD_GATEWAY,
-                Json(json!({ "ok": false, "error": format!("upstream unreachable: {e}") })),
-            )
-                .into_response()
-        }
+    let store = state.store.read().unwrap();
+    let Some(entry) = store.effective_stable() else {
+        return no_stable();
     };
-    let version = tag.trim_start_matches('v').to_string();
-    let asset = asset_name(&version, arch);
+    let Some(asset) = entry.arches.get(arch) else {
+        return no_stable();
+    };
     let base = public_base();
     Json(json!({
         "ok": true,
         "data": {
             "product": "DN7 Panel",
-            "version": version,
+            "version": entry.version,
             "arch": arch,
             "url": format!("{base}/api/panel/download?arch={arch}"),
-            "asset": asset,
+            "asset": store::asset_name(&entry.version, arch),
+            "sha256": asset.sha256,
         }
     }))
     .into_response()
@@ -114,34 +87,27 @@ pub async fn panel_version(State(state): State<AppState>, Query(q): Query<ArchQu
 
 /// GET /api/panel/latest — richer manifest for the website UI (both arches).
 pub async fn panel_latest(State(state): State<AppState>) -> Response {
-    let tag = match latest_tag(&state.http).await {
-        Ok(t) => t,
-        Err(e) => {
-            return (
-                StatusCode::BAD_GATEWAY,
-                Json(json!({ "ok": false, "error": format!("upstream unreachable: {e}") })),
-            )
-                .into_response()
-        }
+    let store = state.store.read().unwrap();
+    let Some(entry) = store.effective_stable() else {
+        return no_stable();
     };
-    let version = tag.trim_start_matches('v').to_string();
     let base = public_base();
     let mut downloads = serde_json::Map::new();
     let mut sha256 = serde_json::Map::new();
-    for arch in ["x86_64", "arm64"] {
-        downloads.insert(
-            arch.to_string(),
-            json!(format!("{base}/api/panel/download?arch={arch}")),
-        );
-        if let Some(h) = sha_for(&state.http, &tag, &asset_name(&version, arch)).await {
-            sha256.insert(arch.to_string(), json!(h));
+    for arch in store::ARCHES {
+        if let Some(a) = entry.arches.get(arch) {
+            downloads.insert(
+                arch.to_string(),
+                json!(format!("{base}/api/panel/download?arch={arch}")),
+            );
+            sha256.insert(arch.to_string(), json!(a.sha256));
         }
     }
     Json(json!({
         "ok": true,
         "data": {
             "product": "DN7 Panel",
-            "version": version,
+            "version": entry.version,
             "downloads": downloads,
             "sha256": sha256,
             "install": "curl -fsSL https://dn7.cn/start.sh | sh",
@@ -163,9 +129,10 @@ async fn fetch_releases_index(http: &reqwest::Client) -> anyhow::Result<serde_js
 }
 
 /// GET /api/panel/releases — the changelog index the panel's "what's new" view
-/// consumes. Mirrored from the GitHub release asset reachable via the
-/// deterministic `releases/latest/download/` redirect (no api.github.com), so
-/// dn7.cn can serve the same changelog when GitHub is slow/blocked.
+/// consumes. Still mirrored from the GitHub release asset (reachable via the
+/// deterministic `releases/latest/download/` redirect, no api.github.com) — the
+/// changelog isn't gated by the stable selection, and GitHub remains the
+/// source of release notes.
 pub async fn panel_releases(State(state): State<AppState>) -> Response {
     match fetch_releases_index(&state.http).await {
         Ok(v) => {
@@ -181,60 +148,124 @@ pub async fn panel_releases(State(state): State<AppState>) -> Response {
     }
 }
 
-/// GET /api/panel/download?arch= — stream the binary from the GitHub release.
+/// GET /api/panel/download?arch= — stream the stored **stable** binary (the
+/// file is the binary with its 64-byte Ed25519 signature appended, so the
+/// downloading panel re-verifies it against its embedded key).
 pub async fn panel_download(State(state): State<AppState>, Query(q): Query<ArchQuery>) -> Response {
     let arch = norm_arch(q.arch.as_deref());
-    let tag = match latest_tag(&state.http).await {
-        Ok(t) => t,
-        Err(e) => {
-            return (
-                StatusCode::BAD_GATEWAY,
-                format!("upstream unreachable: {e}"),
-            )
-                .into_response()
+    let (asset, _version) = {
+        let store = state.store.read().unwrap();
+        let Some(entry) = store.effective_stable() else {
+            return (StatusCode::NOT_FOUND, "no stable release available yet").into_response();
+        };
+        match entry.arches.get(arch) {
+            Some(a) => (a.file.clone(), entry.version.clone()),
+            None => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    format!("stable release has no {arch} build"),
+                )
+                    .into_response()
+            }
         }
     };
-    let version = tag.trim_start_matches('v');
-    let asset = asset_name(version, arch);
-    let url = format!("https://github.com/{GITHUB_REPO}/releases/download/{tag}/{asset}");
-    let upstream = match state.http.get(&url).send().await {
-        Ok(r) => r,
+    let bytes = match store::read_binary(&asset) {
+        Ok(b) => b,
         Err(e) => {
-            return (
-                StatusCode::BAD_GATEWAY,
-                format!("upstream unreachable: {e}"),
-            )
-                .into_response()
+            tracing::error!("download: stored asset {asset} unreadable: {e}");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "binary unavailable").into_response();
         }
     };
-    if !upstream.status().is_success() {
-        return (StatusCode::BAD_GATEWAY, "binary not available yet").into_response();
-    }
-    let length = upstream
-        .headers()
-        .get(header::CONTENT_LENGTH)
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
-    let mut resp = Response::builder()
+    let len = bytes.len();
+    Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/octet-stream")
+        .header(header::CONTENT_LENGTH, len)
         .header(
             header::CONTENT_DISPOSITION,
             format!("attachment; filename=\"{asset}\""),
-        );
-    if let Some(len) = length {
-        resp = resp.header(header::CONTENT_LENGTH, len);
-    }
-    resp.body(Body::from_stream(upstream.bytes_stream()))
+        )
+        .body(Body::from(bytes))
         .unwrap_or_else(|_| (StatusCode::INTERNAL_SERVER_ERROR, "stream error").into_response())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IngestQuery {
+    pub version: String,
+    pub arch: String,
+}
+
+/// POST /api/panel/ingest?version=&arch= — receive a freshly-built panel binary
+/// from CI. The body is the binary with its 64-byte Ed25519 signature appended;
+/// authentication IS that signature: it must verify against the embedded
+/// release key (only the key holder can produce an acceptable binary, so no
+/// shared token is needed). On success the file is stored verbatim and the
+/// version index is updated.
+pub async fn panel_ingest(
+    State(state): State<AppState>,
+    Query(q): Query<IngestQuery>,
+    body: Bytes,
+) -> Response {
+    let version = q.version.trim().trim_start_matches('v').to_string();
+    let arch = norm_arch(Some(&q.arch));
+    if version.is_empty() || !version.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "ok": false, "error": "invalid version" })),
+        )
+            .into_response();
+    }
+
+    // Auth = valid appended release signature over the binary bytes.
+    if !crate::signing::verify_appended(&body) {
+        tracing::warn!(%version, arch, "ingest: rejected — signature verification failed");
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "signature verification failed" })),
+        )
+            .into_response();
+    }
+
+    let file = store::asset_name(&version, arch);
+    if let Err(e) = store::write_binary(&file, &body) {
+        tracing::error!("ingest: failed to store {file}: {e}");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "ok": false, "error": "failed to store binary" })),
+        )
+            .into_response();
+    }
+    let asset = store::ArchAsset {
+        sha256: store::sha256_hex(&body),
+        size: body.len() as u64,
+        file: file.clone(),
+    };
+    let sha = asset.sha256.clone();
+    {
+        let mut store = state.store.write().unwrap();
+        if let Err(e) = store.record(&version, arch, asset) {
+            tracing::error!("ingest: failed to update index: {e}");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "ok": false, "error": "failed to update index" })),
+            )
+                .into_response();
+        }
+    }
+    tracing::info!(%version, arch, size = body.len(), "ingest: stored signed binary");
+    Json(json!({
+        "ok": true,
+        "data": { "version": version, "arch": arch, "asset": file, "sha256": sha }
+    }))
+    .into_response()
 }
 
 /// GET /start.sh — the one-line installer for DN7 Panel.
 ///
 ///   curl -fsSL https://dn7.cn/start.sh | sh
 ///
-/// Detects the CPU arch and downloads the latest DN7 Panel from dn7.cn (which
-/// mirrors the GitHub release), makes it executable, and runs it.
+/// Detects the CPU arch and downloads the latest **stable** DN7 Panel from
+/// dn7.cn, makes it executable, and runs it.
 pub async fn start_script() -> Response {
     let script = r#"#!/bin/sh
 # Digital Network 7 — DN7 Panel installer.
@@ -253,9 +284,11 @@ OUT=dn7-panel
 
 echo "[DN7] downloading DN7 Panel ($ARCH) ..."
 if command -v curl >/dev/null 2>&1; then
-  curl -fL --progress-bar "$URL" -o "$OUT"
+  curl -fL --progress-bar "$URL" -o "$OUT" || {
+    echo "[DN7] download failed (no stable release published yet?)" >&2; exit 1; }
 elif command -v wget >/dev/null 2>&1; then
-  wget -O "$OUT" "$URL"
+  wget -O "$OUT" "$URL" || {
+    echo "[DN7] download failed (no stable release published yet?)" >&2; exit 1; }
 else
   echo "[DN7] neither curl nor wget found" >&2; exit 1
 fi

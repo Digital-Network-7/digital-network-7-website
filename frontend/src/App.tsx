@@ -406,6 +406,10 @@ function Footer({ t }: { t: T }) {
       <div className="ftr-bot">
         <span>© 2025–{year} DN7.cn {t.footer.rights}</span>
         <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">{t.footer.beian}</a>
+        <span className="ftr-friends">
+          {t.footer.friends}:{' '}
+          <a href="https://linux.do" target="_blank" rel="noreferrer">LINUX DO</a>
+        </span>
       </div>
     </footer>
   );

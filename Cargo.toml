@@ -18,6 +18,15 @@ serde_json = "1"
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Verify the Ed25519 release signature appended to every pushed panel binary,
+# using the SAME embedded public key the panel itself trusts. This is the auth
+# for the CI push endpoint: only the release-key holder can produce a binary the
+# site accepts (no shared secret/token needed). Pure Rust, musl-static safe.
+ed25519-dalek = "2"
+# SHA-256 of stored binaries (shown in the admin UI / manifests). Pure Rust.
+sha2 = "0.10"
+# Random admin password (when none is configured) + session tokens. Pure Rust.
+rand = "0.8"
 
 [profile.release]
 opt-level = 3

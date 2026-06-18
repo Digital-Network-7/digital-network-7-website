@@ -21,7 +21,6 @@ export interface Dict {
     ctaDownload: string;
     ctaLearn: string;
   };
-  layers: { title: string; subtitle: string; items: string[] };
   product: {
     tag: string;
     title: string;
@@ -52,24 +51,11 @@ export interface Dict {
 const en: Dict = {
   nav: { product: 'Product', features: 'Features', download: 'Download', docs: 'Docs' },
   hero: {
-    badge: 'Distributed network infrastructure',
+    badge: 'Open-source Linux server panel',
     title: 'Digital Network 7',
-    subtitle: 'A seven-layer network platform. Composable, observable, built to scale.',
+    subtitle: 'Install DN7 Panel on a Linux host and manage terminals, files, containers, websites and databases from one web console.',
     ctaDownload: 'Get DN7 Panel',
     ctaLearn: 'Learn more',
-  },
-  layers: {
-    title: 'Seven layers, one network',
-    subtitle: 'Each layer is independent and composable.',
-    items: [
-      'Transport fabric',
-      'Secure overlay',
-      'Service mesh',
-      'Control plane',
-      'Observability',
-      'Automation',
-      'Interface',
-    ],
   },
   product: {
     tag: 'Flagship',
@@ -105,15 +91,15 @@ const en: Dict = {
     items: [
       { title: 'Single binary', desc: 'Static build, one command.' },
       { title: 'Auto updates', desc: 'New versions roll out automatically.' },
-      { title: 'Observable', desc: 'Live metrics across the stack.' },
-      { title: 'Composable', desc: 'Adopt only what you need.' },
+      { title: 'Observable', desc: 'Live host metrics in the browser.' },
+      { title: 'Service management', desc: 'Handle common server workflows in one place.' },
       { title: 'Extensible', desc: 'A plugin model for new capabilities.' },
       { title: 'Secure by design', desc: 'Encrypted channels, signed releases.' },
     ],
   },
   download: {
     title: 'Install in one line',
-    subtitle: '',
+    subtitle: 'Run this on a Linux host. The installer chooses x86_64 or arm64 automatically.',
     oneLine: 'curl -fsSL https://dn7.cn/start.sh | sh',
     copy: 'Copy',
     copied: 'Copied',
@@ -122,7 +108,7 @@ const en: Dict = {
   footer: {
     rights: 'All rights reserved.',
     beian: '沪ICP备2026021336号',
-    tagline: 'Composable infrastructure for distributed systems.',
+    tagline: 'Open-source tools for Linux servers and self-hosted infrastructure.',
     friends: 'Friends',
   },
 };
@@ -130,16 +116,11 @@ const en: Dict = {
 const zhCN: Dict = {
   nav: { product: '产品', features: '特性', download: '下载', docs: '文档' },
   hero: {
-    badge: '分布式网络基础设施',
+    badge: '开源 Linux 服务器面板',
     title: 'Digital Network 7',
-    subtitle: '七层网络平台。可组合、可观测、为规模而生。',
+    subtitle: '在 Linux 主机上一行安装 DN7 Panel，通过网页控制台管理终端、文件、容器、网站与数据库。',
     ctaDownload: '获取 DN7 Panel',
     ctaLearn: '了解更多',
-  },
-  layers: {
-    title: '七层网络，一体协同',
-    subtitle: '每一层独立、可组合。',
-    items: ['传输底座', '安全叠加', '服务网格', '控制平面', '可观测性', '自动化', '交互界面'],
   },
   product: {
     tag: '旗舰',
@@ -170,15 +151,15 @@ const zhCN: Dict = {
     items: [
       { title: '单一二进制', desc: '静态构建，一条命令。' },
       { title: '自动更新', desc: '新版本自动下发。' },
-      { title: '可观测', desc: '跨层实时指标。' },
-      { title: '可组合', desc: '按需采用。' },
+      { title: '可观测', desc: '在浏览器查看主机实时指标。' },
+      { title: '服务管理', desc: '把常见服务器操作集中到一处。' },
       { title: '可扩展', desc: '插件化，能力随需生长。' },
       { title: '安全设计', desc: '加密信道，签名发布。' },
     ],
   },
   download: {
     title: '一行命令安装',
-    subtitle: '',
+    subtitle: '在 Linux 主机上执行，安装器会自动选择 x86_64 或 arm64。',
     oneLine: 'curl -fsSL https://dn7.cn/start.sh | sh',
     copy: '复制',
     copied: '已复制',
@@ -187,7 +168,7 @@ const zhCN: Dict = {
   footer: {
     rights: '版权所有。',
     beian: '沪ICP备2026021336号',
-    tagline: '面向分布式系统的可组合基础设施。',
+    tagline: '面向 Linux 服务器与自托管基础设施的开源工具。',
     friends: '友情链接',
   },
 };
@@ -195,16 +176,11 @@ const zhCN: Dict = {
 const zhTW: Dict = {
   nav: { product: '產品', features: '特性', download: '下載', docs: '文件' },
   hero: {
-    badge: '分散式網路基礎設施',
+    badge: '開源 Linux 伺服器面板',
     title: 'Digital Network 7',
-    subtitle: '七層網路平台。可組合、可觀測、為規模而生。',
+    subtitle: '在 Linux 主機上一行安裝 DN7 Panel，透過網頁控制台管理終端、檔案、容器、網站與資料庫。',
     ctaDownload: '取得 DN7 Panel',
     ctaLearn: '了解更多',
-  },
-  layers: {
-    title: '七層網路，一體協同',
-    subtitle: '每一層獨立、可組合。',
-    items: ['傳輸底層', '安全疊加', '服務網格', '控制平面', '可觀測性', '自動化', '互動介面'],
   },
   product: {
     tag: '旗艦',
@@ -235,15 +211,15 @@ const zhTW: Dict = {
     items: [
       { title: '單一二進位', desc: '靜態建置，一條命令。' },
       { title: '自動更新', desc: '新版本自動下發。' },
-      { title: '可觀測', desc: '跨層即時指標。' },
-      { title: '可組合', desc: '按需採用。' },
+      { title: '可觀測', desc: '在瀏覽器查看主機即時指標。' },
+      { title: '服務管理', desc: '把常見伺服器操作集中到一處。' },
       { title: '可擴展', desc: '外掛化，能力隨需成長。' },
       { title: '安全設計', desc: '加密通道，簽章發布。' },
     ],
   },
   download: {
     title: '一行命令安裝',
-    subtitle: '',
+    subtitle: '在 Linux 主機上執行，安裝器會自動選擇 x86_64 或 arm64。',
     oneLine: 'curl -fsSL https://dn7.cn/start.sh | sh',
     copy: '複製',
     copied: '已複製',
@@ -252,7 +228,7 @@ const zhTW: Dict = {
   footer: {
     rights: '版權所有。',
     beian: '滬ICP備2026021336號',
-    tagline: '面向分散式系統的可組合基礎設施。',
+    tagline: '面向 Linux 伺服器與自託管基礎設施的開源工具。',
     friends: '友情連結',
   },
 };
@@ -260,16 +236,11 @@ const zhTW: Dict = {
 const ja: Dict = {
   nav: { product: '製品', features: '特長', download: 'ダウンロード', docs: 'ドキュメント' },
   hero: {
-    badge: '分散ネットワーク基盤',
+    badge: 'オープンソース Linux サーバーパネル',
     title: 'Digital Network 7',
-    subtitle: '七層ネットワーク基盤。組み合わせ可能・観測可能・スケール対応。',
+    subtitle: 'Linux ホストに DN7 Panel を導入し、端末、ファイル、コンテナ、サイト、データベースを Web コンソールで管理できます。',
     ctaDownload: 'DN7 Panel を入手',
     ctaLearn: '詳しく',
-  },
-  layers: {
-    title: '七つの層、ひとつのネットワーク',
-    subtitle: '各層は独立し、組み合わせ可能。',
-    items: ['トランスポート', 'セキュア層', 'サービスメッシュ', 'コントロール', '可観測性', '自動化', 'インターフェース'],
   },
   product: {
     tag: '主力',
@@ -300,15 +271,15 @@ const ja: Dict = {
     items: [
       { title: '単一バイナリ', desc: '静的ビルド、ワンコマンド。' },
       { title: '自動更新', desc: '新バージョンを自動配信。' },
-      { title: '可観測', desc: '全層のライブ指標。' },
-      { title: '組み合わせ可能', desc: '必要なものだけ。' },
+      { title: '可観測', desc: 'ホストのライブ指標をブラウザで確認。' },
+      { title: 'サービス管理', desc: '一般的なサーバー操作を一か所に集約。' },
       { title: '拡張可能', desc: 'プラグイン方式で機能を拡張。' },
       { title: '設計から安全', desc: '暗号化と署名済みリリース。' },
     ],
   },
   download: {
     title: 'ワンラインで導入',
-    subtitle: '',
+    subtitle: 'Linux ホストで実行すると、x86_64 または arm64 を自動選択します。',
     oneLine: 'curl -fsSL https://dn7.cn/start.sh | sh',
     copy: 'コピー',
     copied: 'コピー完了',
@@ -317,7 +288,7 @@ const ja: Dict = {
   footer: {
     rights: 'All rights reserved.',
     beian: '沪ICP备2026021336号',
-    tagline: '分散システムのための組み合わせ可能な基盤。',
+    tagline: 'Linux サーバーとセルフホスト基盤のためのオープンソースツール。',
     friends: 'リンク',
   },
 };

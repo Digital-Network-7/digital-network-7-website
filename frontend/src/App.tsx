@@ -8,7 +8,7 @@ function initialLang(): Lang {
   return SUPPORTED.includes(g) ? g : 'en';
 }
 
-const GITHUB_URL = 'https://github.com/Digital-Network-7/DN7-Panel';
+const GITHUB_URL = 'https://github.com/Digital-Network-7/DN7-Website';
 
 // Reveal-on-scroll wrapper: fades + lifts its children into view the first time
 // they enter the viewport. `delay` staggers grouped items.
@@ -75,13 +75,12 @@ export default function App() {
       <Backdrop />
       <Header t={t} lang={lang} onLang={changeLang} />
       <main>
+        <Download t={t} />
         <Hero t={t} />
-        <Layers t={t} />
         <Products t={t} />
         <Product t={t} />
         <OpenSource t={t} />
         <Features t={t} />
-        <Download t={t} />
       </main>
       <Footer t={t} />
     </div>
@@ -92,9 +91,6 @@ function Backdrop() {
   return (
     <div className="backdrop" aria-hidden="true">
       <div className="grid" />
-      <span className="orb o1" />
-      <span className="orb o2" />
-      <span className="orb o3" />
     </div>
   );
 }
@@ -106,14 +102,14 @@ function Header({ t, lang, onLang }: { t: T; lang: Lang; onLang: (l: Lang) => vo
   return (
     <header className="hdr-bar">
       <div className="hdr">
-        <a className="brand" href="#top">
+        <a className="brand" href="#download">
           <img src="/logo.svg" alt="Digital Network 7" />
           <span>Digital Network 7</span>
         </a>
         <nav className="nav">
-          <a href="#products">{t.nav.product}</a>
-          <a href="#features">{t.nav.features}</a>
           <a href="#download">{t.nav.download}</a>
+          <a href="#product">{t.nav.product}</a>
+          <a href="#features">{t.nav.features}</a>
         </nav>
         <div className="langpick">
           <button className="langbtn" onClick={() => setOpen((v) => !v)} onBlur={() => setTimeout(() => setOpen(false), 150)}>
@@ -137,7 +133,7 @@ function Header({ t, lang, onLang }: { t: T; lang: Lang; onLang: (l: Lang) => vo
 
 function Hero({ t }: { t: T }) {
   return (
-    <section className="hero" id="top">
+    <section className="hero" id="overview">
       <div className="hero-inner">
         <span className="badge enter" style={{ animationDelay: '60ms' }}>{t.hero.badge}</span>
         <h1 className="hero-title enter" style={{ animationDelay: '140ms' }}>{t.hero.title}</h1>
@@ -148,25 +144,7 @@ function Hero({ t }: { t: T }) {
         </div>
       </div>
       <div className="hero-art enter-art" style={{ animationDelay: '200ms' }}>
-        <NetworkArt />
-      </div>
-    </section>
-  );
-}
-
-function Layers({ t }: { t: T }) {
-  return (
-    <section className="layers" id="layers">
-      <Reveal className="sec-title">{t.layers.title}</Reveal>
-      <Reveal className="sec-sub" delay={60}>{t.layers.subtitle}</Reveal>
-      <div className="layer-stack">
-        {t.layers.items.map((name, i) => (
-          <Reveal key={i} className="layer" delay={i * 70}>
-            <span className="layer-no">L{7 - i}</span>
-            <span className="layer-name">{name}</span>
-            <span className="layer-line" />
-          </Reveal>
-        ))}
+        <PanelGlyph />
       </div>
     </section>
   );
@@ -274,6 +252,7 @@ function Download({ t }: { t: T }) {
   return (
     <section className="download" id="download">
       <Reveal className="sec-title">{t.download.title}</Reveal>
+      {t.download.subtitle && <Reveal className="sec-sub" delay={60}>{t.download.subtitle}</Reveal>}
 
       <Reveal className="cmd" delay={120}>
         <code>{cmd}</code>
@@ -397,7 +376,7 @@ function Footer({ t }: { t: T }) {
   return (
     <footer className="ftr">
       <div className="ftr-top">
-        <a className="brand sm" href="#top">
+        <a className="brand sm" href="#download">
           <img src="/logo.svg" alt="Digital Network 7" />
           <span>Digital Network 7</span>
         </a>
@@ -438,31 +417,6 @@ function CheckIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 12.5l4.5 4.5L19 7" />
-    </svg>
-  );
-}
-
-function NetworkArt() {
-  // A stylized seven-node network: concentric rings + linked nodes, animated.
-  const nodes = Array.from({ length: 7 }, (_, i) => {
-    const a = (i / 7) * Math.PI * 2 - Math.PI / 2;
-    return { x: 150 + Math.cos(a) * 110, y: 150 + Math.sin(a) * 110, i };
-  });
-  return (
-    <svg className="net" viewBox="0 0 300 300" fill="none">
-      <circle cx="150" cy="150" r="110" className="net-ring" />
-      <circle cx="150" cy="150" r="70" className="net-ring" />
-      <circle cx="150" cy="150" r="32" className="net-ring" />
-      {nodes.map((n) => (
-        <line key={`l${n.i}`} x1="150" y1="150" x2={n.x} y2={n.y} className="net-link" style={{ ['--d' as string]: String(n.i) }} />
-      ))}
-      {nodes.map((n) => (
-        <line key={`r${n.i}`} x1={n.x} y1={n.y} x2={nodes[(n.i + 1) % 7].x} y2={nodes[(n.i + 1) % 7].y} className="net-link faint" />
-      ))}
-      {nodes.map((n) => (
-        <circle key={`n${n.i}`} cx={n.x} cy={n.y} r="7" className="net-node" style={{ ['--d' as string]: String(n.i) }} />
-      ))}
-      <circle cx="150" cy="150" r="11" className="net-core" />
     </svg>
   );
 }

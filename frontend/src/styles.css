@@ -35,11 +35,12 @@ a { color: inherit; text-decoration: none; }
 /* ---- Backdrop ---- */
 .backdrop { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
   background:
-    radial-gradient(1100px 680px at 82% -12%, rgba(59, 130, 246, 0.18), transparent 60%),
-    radial-gradient(900px 620px at -8% 108%, rgba(139, 92, 246, 0.16), transparent 58%),
+    radial-gradient(1000px 620px at 80% -10%, rgba(59, 130, 246, 0.16), transparent 62%),
+    radial-gradient(820px 560px at 8% 102%, rgba(34, 211, 238, 0.08), transparent 60%),
+    linear-gradient(180deg, rgba(139, 92, 246, 0.08), transparent 42%),
     var(--bg);
 }
-.backdrop .grid { position: absolute; inset: -2px;
+.backdrop .grid { position: absolute; inset: 0;
   background-image:
     linear-gradient(rgba(90, 120, 180, 0.06) 1px, transparent 1px),
     linear-gradient(90deg, rgba(90, 120, 180, 0.06) 1px, transparent 1px);
@@ -47,14 +48,6 @@ a { color: inherit; text-decoration: none; }
   -webkit-mask-image: radial-gradient(circle at 50% 32%, #000, transparent 80%);
   mask-image: radial-gradient(circle at 50% 32%, #000, transparent 80%);
 }
-.backdrop .orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.5; }
-.backdrop .o1 { width: 460px; height: 460px; left: -90px; top: -110px; background: radial-gradient(circle, rgba(34, 211, 238, 0.5), transparent 70%); animation: of1 20s ease-in-out infinite; }
-.backdrop .o2 { width: 520px; height: 520px; right: -120px; top: 18%; background: radial-gradient(circle, rgba(139, 92, 246, 0.45), transparent 70%); animation: of2 24s ease-in-out infinite; }
-.backdrop .o3 { width: 420px; height: 420px; left: 30%; bottom: -140px; background: radial-gradient(circle, rgba(59, 130, 246, 0.4), transparent 70%); animation: of3 28s ease-in-out infinite; }
-@keyframes of1 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(40px, 34px); } }
-@keyframes of2 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-46px, 30px); } }
-@keyframes of3 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(34px, -30px); } }
-@media (prefers-reduced-motion: reduce) { .orb { animation: none !important; } }
 
 /* ---- Entrance + scroll reveal ---- */
 .enter { opacity: 0; animation: enterUp 0.7s cubic-bezier(0.22, 0.7, 0.2, 1) forwards; }
@@ -98,7 +91,7 @@ main, .ftr { position: relative; z-index: 1; }
 .langpop button.on { color: var(--cy); }
 
 /* ---- Hero ---- */
-.hero { max-width: var(--maxw); margin: 0 auto; padding: 60px 24px 40px; display: grid;
+.hero { max-width: var(--maxw); margin: 0 auto; padding: 38px 24px 42px; display: grid;
   grid-template-columns: 1.15fr 0.85fr; gap: 30px; align-items: center; }
 .badge { display: inline-block; font-size: 12.5px; color: var(--cy); border: 1px solid var(--line2);
   background: rgba(34, 211, 238, 0.07); padding: 5px 13px; border-radius: 99px; margin-bottom: 22px; }
@@ -115,35 +108,12 @@ main, .ftr { position: relative; z-index: 1; }
 .btn:active { transform: translateY(1px); }
 .btn.ghost { background: var(--panel); border: 1px solid var(--line2); color: var(--fg); box-shadow: none; }
 .hero-art { display: flex; justify-content: center; }
-
-/* network art */
-.net { width: 100%; max-width: 340px; }
-.net-ring { stroke: rgba(90, 120, 180, 0.22); stroke-width: 1; }
-.net-link { stroke: rgba(34, 211, 238, 0.35); stroke-width: 1.2; animation: pulse 3s ease-in-out infinite; animation-delay: calc(var(--d) * 0.22s); }
-.net-link.faint { stroke: rgba(139, 92, 246, 0.22); animation: none; }
-.net-node { fill: var(--cy); filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.8)); animation: nodep 3s ease-in-out infinite; animation-delay: calc(var(--d) * 0.22s); }
-.net-core { fill: #fff; filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.9)); }
-@keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.9; } }
-@keyframes nodep { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .net-link, .net-node { animation: none; } }
+.hero-art .panel-glyph { max-width: 360px; }
 
 /* ---- Section shared ---- */
 section { scroll-margin-top: 70px; }
 .sec-title { text-align: center; font-size: 30px; margin: 0 0 10px; letter-spacing: -0.3px; }
 .sec-sub { text-align: center; color: var(--mut); max-width: 620px; margin: 0 auto 36px; }
-
-/* ---- Layers ---- */
-.layers { max-width: 860px; margin: 0 auto; padding: 56px 24px; }
-.layer-stack { display: flex; flex-direction: column; gap: 10px; }
-.layer { display: flex; align-items: center; gap: 16px; padding: 15px 20px; border: 1px solid var(--line);
-  border-radius: 14px; background: var(--panel); backdrop-filter: blur(8px);
-  transition: transform 0.18s, border-color 0.18s;
-  transform: translateX(calc(var(--i) * 0px)); }
-.layer:hover { border-color: var(--line2); transform: translateX(6px); }
-.layer-no { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--cy); width: 30px; flex: 0 0 auto;
-  font-weight: 600; }
-.layer-name { font-size: 15px; font-weight: 520; flex: 1; }
-.layer-line { height: 2px; width: 56px; border-radius: 2px; background: linear-gradient(90deg, var(--cy), var(--vio)); opacity: 0.5; }
 
 /* ---- Products grid ---- */
 .products { max-width: var(--maxw); margin: 0 auto; padding: 56px 24px 30px; }
@@ -202,9 +172,12 @@ section { scroll-margin-top: 70px; }
 .feat p { margin: 0; color: var(--mut); font-size: 14px; }
 
 /* ---- Download ---- */
-.download { max-width: 820px; margin: 0 auto; padding: 56px 24px 30px; }
+.download { max-width: var(--maxw); margin: 0 auto; padding: 60px 24px 38px; text-align: left;
+  display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(380px, 1.05fr); column-gap: 34px; align-items: center; }
+.download .sec-title { text-align: left; font-size: 46px; line-height: 1.08; margin-bottom: 14px; }
+.download .sec-sub { text-align: left; margin: 0 0 26px; }
 .cmd { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line2); border-radius: 14px;
-  background: var(--panel2); padding: 16px 16px 16px 20px; box-shadow: var(--shadow); }
+  background: var(--panel2); padding: 16px 16px 16px 20px; box-shadow: var(--shadow); max-width: 820px; margin: 0; text-align: left; }
 .cmd code { flex: 1; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14.5px; color: var(--cy);
   overflow-x: auto; white-space: nowrap; }
 .copybtn { flex: 0 0 auto; background: linear-gradient(135deg, var(--br), var(--vio)); color: #fff; border: none;
@@ -224,7 +197,7 @@ section { scroll-margin-top: 70px; }
 .dlbtn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
   border-radius: 9px; background: var(--panel2); border: 1px solid var(--line2); color: var(--cy); font-size: 16px; }
 .dlbtn:hover { border-color: var(--cy); }
-.dl-note { text-align: center; color: var(--mut); font-size: 13px; margin-top: 18px; }
+.dl-note { text-align: left; color: var(--mut); font-size: 13px; margin-top: 18px; }
 
 /* ---- Open source ---- */
 .opensource { max-width: var(--maxw); margin: 0 auto; padding: 40px 24px; }
@@ -241,7 +214,7 @@ section { scroll-margin-top: 70px; }
   color: var(--mut); word-break: break-all; }
 
 /* ---- Fake install terminal ---- */
-.term { max-width: 680px; margin: 20px auto 0; }
+.term { grid-column: 2; grid-row: 1 / span 4; max-width: 760px; margin: 0; text-align: left; }
 .term-box { border: 1px solid var(--line2); border-radius: 14px; overflow: hidden; background: #05080f; box-shadow: var(--shadow); }
 .term-head { display: flex; align-items: center; gap: 7px; height: 44px; padding: 0 16px; box-sizing: border-box;
   background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid var(--line); }
@@ -273,9 +246,12 @@ section { scroll-margin-top: 70px; }
 
 /* ---- Responsive ---- */
 @media (max-width: 860px) {
+  .download { display: block; padding-top: 38px; text-align: center; }
+  .download .sec-title, .download .sec-sub, .dl-note { text-align: center; }
+  .cmd { margin: 0 auto; }
+  .term { max-width: 680px; margin: 20px auto 0; }
   .hero { grid-template-columns: 1fr; padding-top: 30px; }
   .hero-art { order: -1; }
-  .net { max-width: 240px; }
   .hero-title { font-size: 42px; }
   .prod-card { grid-template-columns: 1fr; }
   .prod-visual { order: -1; }

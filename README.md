@@ -72,7 +72,7 @@ Adding a language = one entry in `frontend/src/i18n.ts` plus its code in
 
 ```sh
 # Terminal 1 — backend (serves /api + /start.sh on :8090)
-cargo run
+cargo run -- --foreground
 
 # Terminal 2 — frontend dev server (proxies /api to :8090)
 cd frontend && npm install && npm run dev
@@ -87,6 +87,23 @@ cd .. && cargo build --release           # embeds dist → one binary
 
 CI (`.github/workflows/release.yml`) does both on every push to `main` and
 publishes static musl binaries (x86_64 + arm64) as `1.0.<run_number>`.
+
+## Run
+
+Run the binary directly. It starts itself in the background, prints the PID and
+log path, then returns control to your shell:
+
+```sh
+./dn7-website
+```
+
+Logs are appended to `<DN7_DATA_DIR>/logs/dn7-website.log`.
+
+For local debugging, run it in the foreground:
+
+```sh
+./dn7-website --foreground
+```
 
 ## Configuration
 

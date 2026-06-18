@@ -20,8 +20,13 @@ mod signing;
 mod store;
 
 use std::collections::HashSet;
-use std::net::SocketAddr;
+use std::ffi::{OsStr, OsString};
+use std::fs::OpenOptions;
+use std::net::{SocketAddr, TcpStream};
+use std::path::Path;
+use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex, RwLock};
+use std::time::Duration;
 
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
@@ -33,6 +38,8 @@ use store::Store;
 /// (`releases.json`). The binaries now live here; only the changelog is still
 /// mirrored from GitHub. Kept in one place so it's trivial to change later.
 pub const GITHUB_REPO: &str = "Digital-Network-7/DN7-Panel";
+
+const DAEMON_CHILD_ENV: &str = "DN7_WEBSITE_DAEMON_CHILD";
 
 #[derive(Clone)]
 pub struct AppState {
@@ -48,16 +55,17 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    if maybe_spawn_daemon().await? {
+        return Ok(());
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
-    let port: u16 = std::env::var("DN7_PORT")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(8090);
+    let port = resolve_port();
 
     let http = reqwest::Client::builder()
         .user_agent("dn7-website")
@@ -107,4 +115,84 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(%addr, "dn7 website listening");
     axum::serve(listener, app.into_make_service()).await?;
     Ok(())
+}
+
+fn resolve_port() -> u16 {
+    std::env::var("DN7_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(8090)
+}
+
+async fn maybe_spawn_daemon() -> anyhow::Result<bool> {
+    let args: Vec<OsString> = std::env::args_os().collect();
+    let foreground = args
+        .iter()
+        .skip(1)
+        .any(|a| is_foreground_arg(a.as_os_str()));
+    if foreground || std::env::var_os(DAEMON_CHILD_ENV).is_some() {
+        return Ok(false);
+    }
+
+    let exe = std::env::current_exe()?;
+    let child_args = args
+        .into_iter()
+        .skip(1)
+        .filter(|a| !is_daemon_arg(a.as_os_str()) && !is_foreground_arg(a.as_os_str()))
+        .collect::<Vec<_>>();
+
+    let log_path = store::data_root().join("logs").join("dn7-website.log");
+    if let Some(parent) = log_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let stdout = open_log(&log_path)?;
+    let stderr = stdout.try_clone()?;
+
+    let mut child = Command::new(exe)
+        .args(child_args)
+        .env(DAEMON_CHILD_ENV, "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(stdout))
+        .stderr(Stdio::from(stderr))
+        .spawn()?;
+
+    wait_for_daemon(&mut child, resolve_port(), &log_path).await?;
+
+    println!(
+        "DN7 Website started in the background.\n  pid: {}\n  log: {}",
+        child.id(),
+        log_path.display()
+    );
+    Ok(true)
+}
+
+fn is_daemon_arg(arg: &OsStr) -> bool {
+    arg == "--daemon" || arg == "-d"
+}
+
+fn is_foreground_arg(arg: &OsStr) -> bool {
+    arg == "--foreground" || arg == "-f"
+}
+
+async fn wait_for_daemon(child: &mut Child, port: u16, log_path: &Path) -> anyhow::Result<()> {
+    for _ in 0..30 {
+        if let Some(status) = child.try_wait()? {
+            anyhow::bail!(
+                "dn7 website failed to start in the background (status: {status}). Check {}",
+                log_path.display()
+            );
+        }
+        if TcpStream::connect(("127.0.0.1", port)).is_ok() {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    anyhow::bail!(
+        "dn7 website is still starting and port {port} is not reachable yet. Check {}",
+        log_path.display()
+    );
+}
+
+fn open_log(path: &Path) -> anyhow::Result<std::fs::File> {
+    Ok(OpenOptions::new().create(true).append(true).open(path)?)
 }

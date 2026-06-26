@@ -19,6 +19,11 @@ mod assets;
 mod signing;
 mod store;
 
+// High-throughput multithreaded allocator: cuts per-request malloc/free cost
+// (headers, JSON, response bodies) under high concurrency vs the system one.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::fs::OpenOptions;
@@ -109,6 +114,9 @@ async fn main() -> anyhow::Result<()> {
         // Everything else: the embedded SPA (with client-side routing fallback).
         .fallback(assets::static_handler)
         .with_state(state);
+
+    // Precompress the embedded frontend once now (not on the first request).
+    assets::warm();
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
